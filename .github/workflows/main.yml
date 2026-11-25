@@ -31,14 +31,13 @@ jobs:
           TEAM_NAME: "CODE_WARRIORS"
           LEADER_NAME: "AFRID"
         run: |
-          # Loop guard: stop if 5 consecutive [AI-AGENT] commits already exist
           AI_COMMITS=$(git log -n 5 --pretty=format:%s | grep -c "^\[AI-AGENT\]" || true)
           if [ "$AI_COMMITS" -ge 5 ]; then
             echo "Retry limit (5) reached. Halting auto-repair."
             exit 1
           fi
 
-          curl -X POST "$ http://127.0.0.1:8000" \
+          curl -f -X POST "$AGENT_WEBHOOK_URL" \
             -H "Content-Type: application/json" \
             -d "{
               \"repo_url\": \"${{ github.server_url }}/${{ github.repository }}\",
