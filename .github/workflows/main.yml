@@ -1,0 +1,49 @@
+name: Java CI Auto-Heal Pipeline
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 6
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: "17"
+          distribution: "temurin"
+          cache: maven
+
+      - name: Run Maven Tests
+        run: mvn test
+
+      - name: Trigger Autonomous AI Agent on Failure
+        if: failure()
+        env:
+          AGENT_WEBHOOK_URL: ${{ secrets.AGENT_WEBHOOK_URL }}
+          TEAM_NAME: "CODE_WARRIORS"
+          LEADER_NAME: "AFRID"
+        run: |
+          # Loop guard: stop if 5 consecutive [AI-AGENT] commits already exist
+          AI_COMMITS=$(git log -n 5 --pretty=format:%s | grep -c "^\[AI-AGENT\]" || true)
+          if [ "$AI_COMMITS" -ge 5 ]; then
+            echo "Retry limit (5) reached. Halting auto-repair."
+            exit 1
+          fi
+
+          curl -X POST "$AGENT_WEBHOOK_URL" \
+            -H "Content-Type: application/json" \
+            -d "{
+              \"repo_url\": \"${{ github.server_url }}/${{ github.repository }}\",
+              \"team_name\": \"$TEAM_NAME\",
+              \"leader_name\": \"$LEADER_NAME\",
+              \"branch\": \"${{ github.ref_name }}\",
+              \"run_id\": \"${{ github.run_id }}\"
+            }"
