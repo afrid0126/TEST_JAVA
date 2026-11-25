@@ -38,7 +38,7 @@ jobs:
             exit 1
           fi
 
-          curl -X POST "$AGENT_WEBHOOK_URL" \
+          curl -X POST "$ http://127.0.0.1:8000" \
             -H "Content-Type: application/json" \
             -d "{
               \"repo_url\": \"${{ github.server_url }}/${{ github.repository }}\",
