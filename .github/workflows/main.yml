@@ -1,13 +1,20 @@
+
 name: Java CI Auto-Heal Pipeline
 
 on:
   push:
     branches: ["**"]
-  pull_request:
+
+permissions:
+  contents: read
 
 jobs:
   build-and-test:
+    # Do not run CI again for an AI-generated repair commit.
+    if: ${{ !contains(github.event.head_commit.message, '[AI-AGENT]') }}
+
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -28,21 +35,27 @@ jobs:
         if: failure()
         env:
           AGENT_WEBHOOK_URL: ${{ secrets.AGENT_WEBHOOK_URL }}
-          TEAM_NAME: "CODE_WARRIORS"
-          LEADER_NAME: "AFRID"
+          REPO_URL: ${{ github.server_url }}/${{ github.repository }}
+          TEAM_NAME: CODE_WARRIORS
+          LEADER_NAME: AFRID
+          BRANCH_NAME: ${{ github.ref_name }}
+          RUN_ID: ${{ github.run_id }}
         run: |
-          AI_COMMITS=$(git log -n 5 --pretty=format:%s | grep -c "^\[AI-AGENT\]" || true)
-          if [ "$AI_COMMITS" -ge 5 ]; then
-            echo "Retry limit (5) reached. Halting auto-repair."
-            exit 1
-          fi
+          echo "Maven failed. Triggering AI repair agent..."
 
-          curl -f -X POST "$AGENT_WEBHOOK_URL" \
+          curl --fail-with-body --retry 3 \
+            -X POST "$AGENT_WEBHOOK_URL" \
             -H "Content-Type: application/json" \
-            -d "{
-              \"repo_url\": \"${{ github.server_url }}/${{ github.repository }}\",
-              \"team_name\": \"$TEAM_NAME\",
-              \"leader_name\": \"$LEADER_NAME\",
-              \"branch\": \"${{ github.ref_name }}\",
-              \"run_id\": \"${{ github.run_id }}\"
-            }"
+            -d "$(jq -n \
+              --arg repo_url "$REPO_URL" \
+              --arg team_name "$TEAM_NAME" \
+              --arg leader_name "$LEADER_NAME" \
+              --arg branch "$BRANCH_NAME" \
+              --arg run_id "$RUN_ID" \
+              '{
+                repo_url: $repo_url,
+                team_name: $team_name,
+                leader_name: $leader_name,
+                branch: $branch,
+                run_id: $run_id
+              }')"
